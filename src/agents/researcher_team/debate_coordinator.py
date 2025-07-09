@@ -32,6 +32,23 @@ class DebateCoordinator:
             tokens = cb.total_tokens
 
         return DebateTurn(speaker=speaker, message=response.strip(), tokens_used=tokens)
+        
+    def _summarize_turn(self, text: str, speaker: str) -> str:
+    summarizer_prompt = ChatPromptTemplate.from_messages([
+        SystemMessagePromptTemplate.from_template(f"""
+            You are a debate summarizer for financial debates.
+            Summarize the key arguments made by the {speaker.lower()} debater.
+            Keep only the essential numbered points. Be concise.
+            Limit to ~100 words.
+        """),
+        HumanMessagePromptTemplate.from_template("{input}")
+    ])
+
+    chain = summarizer_prompt | self.llm | StrOutputParser()
+    with get_openai_callback() as cb:
+        summary = chain.invoke({"input": text})
+    return summary.strip()
+
 
     def conduct_debate(self, bullish_thesis: str, bearish_thesis: str, rounds: int = 3) -> DebateResult:
         turns = []
@@ -45,8 +62,9 @@ class DebateCoordinator:
             bear_turn = self._generate_response(bull_turn.message, "Bearish")
             turns.append(bear_turn)
 
-            prompt_bear = bear_turn.message
-            prompt_bull = bull_turn.message
+            prompt_bear = self._summarize_turn(bear_turn.message, "Bearish")
+            prompt_bull = self._summarize_turn(bull_turn.message, "Bullish")
+
 
         summary_prompt = ChatPromptTemplate.from_messages([
             SystemMessagePromptTemplate.from_template("""
