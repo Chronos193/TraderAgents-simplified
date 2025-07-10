@@ -8,7 +8,8 @@ from src.agents.risk_management_team import (
     ConservativeDebatorAgent,
     NeutralDebatorAgent,
 )
-
+import time
+from langchain_core.output_parsers import PydanticOutputParser
 # ---------------------
 # Coordinator Class
 # ---------------------
@@ -27,9 +28,11 @@ class DebateCoordinatorAgent:
         neutral_response = ""
 
         for round_num in range(1, self.n_rounds + 1):
+            if (round_num) % 2 == 0 and (round_num) < self.n_rounds:
+                print("🕒 Waiting 60 seconds to respect TPM limits...")
+                time.sleep(60)
             print(f"🔁 Starting round {round_num}...")
 
-            # Conservative speaks
             conservative_response = self.conservative.run({
                 **inputs,
                 "current_risky_response": aggressive_response,
@@ -38,7 +41,6 @@ class DebateCoordinatorAgent:
             })
             history.append(f"Round {round_num} - Conservative:\n{conservative_response}")
 
-            # Aggressive speaks
             aggressive_response = self.aggressive.run({
                 **inputs,
                 "current_safe_response": conservative_response,
@@ -47,7 +49,6 @@ class DebateCoordinatorAgent:
             })
             history.append(f"Round {round_num} - Aggressive:\n{aggressive_response}")
 
-            # Neutral speaks
             neutral_response = self.neutral.run({
                 **inputs,
                 "current_risky_response": aggressive_response,
@@ -56,9 +57,16 @@ class DebateCoordinatorAgent:
             })
             history.append(f"Round {round_num} - Neutral:\n{neutral_response}")
 
-        # ------------------------
-        # Generate Summary + Decision
-        # ------------------------
+        # ✅ Use Pydantic parser
+        parser = PydanticOutputParser(pydantic_object=DebateCoordinatorOutput)
+
+        format_instructions = parser.get_format_instructions()
+        print("=====================================Conservative_response=============================================")
+        print(conservative_response)
+        print("=====================================Neutral_response=============================================")
+        print(neutral_response)
+        print("=====================================Aggressive_response=============================================")
+        print(aggressive_response)
         print("🧠 Debate concluded. Generating summary and final decision...\n")
 
         summary_prompt = f"""
@@ -70,37 +78,20 @@ Trader's Proposal:
 Debate Transcript:
 {'\n'.join(history)}
 
-Please return your answer in the following JSON format:
-{{
-  "analyst_responses": [
-    {{ "role": "aggressive", "final_argument": "..." }},
-    {{ "role": "conservative", "final_argument": "..." }},
-    {{ "role": "neutral", "final_argument": "..." }}
-  ],
-  "rounds_transcript": [...],
-  "final_decision": {{
-    "decision": "accept" | "reject" | "revise",
-    "reason": "...",
-    "recommendation": "...",
-    "confidence": "high" | "medium" | "low",
-    "notes": "..."
-  }}
-}}
+Please return your answer in the following format:
+{format_instructions}
 """
+
         summary_response = self.summarizer_llm.invoke(summary_prompt)
 
         try:
-            # 🛠 Extract only the JSON block if wrapped in backticks
-            match = re.search(r"```(?:json)?\s*([\s\S]*?)```", summary_response.content)
-            json_str = match.group(1) if match else summary_response.content.strip()
-
-            structured_output: DebateCoordinatorOutput = json.loads(json_str)
-            structured_output["rounds_transcript"] = history
-            return structured_output
+            parsed_output: DebateCoordinatorOutput = parser.parse(summary_response.content)
+            parsed_output.rounds_transcript = history
+            return parsed_output
 
         except Exception as e:
             raise ValueError(
-                f"[ERROR] Could not parse summary JSON:\n\n{summary_response.content}\n\n{e}"
+                f"[ERROR] Could not parse structured summary:\n\n{summary_response.content}\n\n{e}"
             )
 
     def get_total_tokens_used(self) -> int:

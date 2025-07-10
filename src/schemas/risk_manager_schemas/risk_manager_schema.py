@@ -1,20 +1,28 @@
-from typing import List, Literal, Optional, TypedDict
+# src/schemas/risk_manager_schemas/risk_manager_schema.py
+from pydantic import BaseModel, field_validator
+from typing import List, Literal
 
-# ---------------------
-# Output Schema
-# ---------------------
-class AnalystResponse(TypedDict):
+
+class AnalystResponse(BaseModel):
     role: Literal["aggressive", "conservative", "neutral"]
     final_argument: str
 
-class FinalDecision(TypedDict):
+    @field_validator("role", mode="before")
+    @classmethod
+    def lowercase_role(cls, v):
+        return v.lower()
+
+
+class FinalDecision(BaseModel):
     decision: Literal["accept", "reject", "revise"]
     reason: str
-    recommendation: Optional[str]
+    recommendation: str
     confidence: Literal["high", "medium", "low"]
-    notes: Optional[str]
+    notes: str
 
-class DebateCoordinatorOutput(TypedDict):
+
+class DebateCoordinatorOutput(BaseModel):
     analyst_responses: List[AnalystResponse]
     rounds_transcript: List[str]
     final_decision: FinalDecision
+

@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+
 # ---------------------------
 # Sample TradeProposal Input
 # ---------------------------
@@ -43,19 +44,22 @@ sample_input = {
 # ---------------------------
 # Run Coordinator Agent
 # ---------------------------
-coordinator = DebateCoordinatorAgent(n_rounds=2)
-
+coordinator = DebateCoordinatorAgent(n_rounds=4)
 result = coordinator.run_debate(sample_input)
 
 # ---------------------------
 # Output Results
 # ---------------------------
 print("\n📄 Analyst Final Arguments:")
-for analyst in result["analyst_responses"]:
-    print(f"\n🧠 {analyst['role'].capitalize()} Analyst:\n{analyst['final_argument']}")
+for analyst in result.analyst_responses:
+    print(f"\n🧠 {analyst.role.capitalize()} Analyst:\n{analyst.final_argument}")
 
 print("\n📜 Final Decision:")
-for k, v in result["final_decision"].items():
-    print(f"{k}: {v}")
+final = result.final_decision
+print(f"decision: {final.decision}")
+print(f"reason: {final.reason}")
+print(f"recommendation: {final.recommendation}")
+print(f"confidence: {final.confidence}")
+print(f"notes: {final.notes}")
 
 print(f"\n🧮 Total Tokens Used: {coordinator.get_total_tokens_used()}")

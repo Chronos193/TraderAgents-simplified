@@ -4,11 +4,13 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain_groq import ChatGroq
 from langchain_community.callbacks.manager import get_openai_callback
-
+from langchain.memory import CombinedMemory
+from langchain.memory import ConversationSummaryMemory
+from langchain.memory import ConversationBufferWindowMemory
 class BaseRiskDebator(ABC):
     def __init__(self):
-        self.memory = ConversationBufferMemory(return_messages=True)
         self.llm = ChatGroq(model="llama3-8b-8192")
+        self.memory = ConversationSummaryMemory(llm=self.llm, return_messages=True, memory_key="summary_history")
         self.prompt_template = self.define_prompt()
         self.total_tokens_used = 0
         self.total_cost = 0.0
