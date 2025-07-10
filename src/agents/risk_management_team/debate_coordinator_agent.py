@@ -70,7 +70,7 @@ class DebateCoordinatorAgent:
         print("🧠 Debate concluded. Generating summary and final decision...\n")
 
         summary_prompt = f"""
-You are a final decision maker summarizing a multi-agent investment debate.
+You are a final decision maker summarizing a multi-agent investment debate involving three analysts: Conservative, Aggressive, and Neutral.
 
 Trader's Proposal:
 {inputs.get('trader_decision') or inputs.get('reason_for_trade')}
@@ -78,9 +78,27 @@ Trader's Proposal:
 Debate Transcript:
 {'\n'.join(history)}
 
-Please return your answer in the following format:
+Your job is to synthesize the debate and make a final decision on the trade. Choose between:
+- "accept" → The trade is sound and should be executed as proposed.
+- "revise" → The trade has merit but should be adjusted (e.g., timing, size, portfolio fit).
+- "reject" → The trade is fundamentally flawed or too risky, and should not be executed in any form.
+
+When deciding between **revise** and **reject**, consider:
+- Is the core thesis promising but poorly implemented? → Choose **revise**.
+- Are the market conditions or portfolio risks too severe even with adjustments? → Choose **reject**.
+
+Provide:
+1. The structured analyst responses.
+2. Your final decision (accept / revise / reject).
+3. Your rationale.
+4. A specific recommendation to the trader.
+5. Your confidence level.
+6. Any notes the team should consider for future trades.
+
+Please return your answer in **valid JSON format** with this structure:
 {format_instructions}
 """
+
 
         summary_response = self.summarizer_llm.invoke(summary_prompt)
 
