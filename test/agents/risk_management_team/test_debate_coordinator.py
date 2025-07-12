@@ -38,18 +38,49 @@ sample_input = {
 
     # --- Meta ---
     "reason_for_trade": "Capitalizing on NVIDIA's dominant position in AI chip market",
-    "timestamp": "2025-07-10T12:30:00Z"
+    "timestamp": "2025-07-10T12:30:00Z",
+
+    # --- Required for summarizer ---
+    "fundamentals": """
+NVIDIA reported 20% YoY revenue growth and record gross margins at 65%. Free cash flow increased by 18% due to improved efficiency in chip production. Debt levels remain moderate, and cash reserves stand at $10B.
+""",
+    "technical": """
+{
+  "macd": 2.1,
+  "signal": 1.7,
+  "histogram": 0.4,
+  "rsi": 69.5,
+  "recommendation": "Buy - bullish momentum continues, but nearing overbought"
+}
+""",
+    "news": """
+- "NVIDIA Surpasses Expectations With Record Q2 Earnings"
+- "AI Demand Fuels Record GPU Shipments"
+- "SEC Investigates GPU Export Licensing to China"
+
+Themes:
+- Strong demand from AI industry and data centers
+- Potential geopolitical/regulatory risk on export compliance
+""",
+    "sentiment": """
+Retail investors are excited by strong AI demand and GPU dominance.
+Institutional investors express concern about export restrictions to China.
+Overall sentiment is cautiously optimistic.
+"""
 }
 
 # ---------------------------
 # Run Coordinator Agent
 # ---------------------------
-coordinator = DebateCoordinatorAgent(n_rounds=4)
+coordinator = DebateCoordinatorAgent(n_rounds=3)
 result = coordinator.run_debate(sample_input)
 
 # ---------------------------
 # Output Results
 # ---------------------------
+print(sample_input["volatility_indicators"])
+print(type(sample_input["volatility_indicators"]))
+
 print("\n📄 Analyst Final Arguments:")
 for analyst in result.analyst_responses:
     print(f"\n🧠 {analyst.role.capitalize()} Analyst:\n{analyst.final_argument}")

@@ -5,39 +5,54 @@ class AggressiveDebatorAgent(BaseRiskDebator):
     def define_prompt(self) -> ChatPromptTemplate:
         system_prompt = SystemMessagePromptTemplate.from_template(
             """
-You are the Risky Risk Analyst, a bold debater who champions high-risk, high-reward opportunities.
-Your job is to advocate for aggressive investment strategies and counter the cautious arguments from other analysts.
+You are the Risky Risk Analyst: a bold, high-conviction strategist who argues in favor of high-risk, high-reward opportunities.
+
+Your job is to:
+- Advocate strongly for the proposed trade.
+- Emphasize upside, growth signals, and catalysts.
+- Reframe risks as necessary steps for bold returns.
+
+**Output Format Rules**
+- Only use bullet points (`•`, `+`, or `-`) — no paragraphs.
+- Be concise and direct (aim for max 100 words).
+- Skip intros and conclusions.
+- Focus only on strong, convincing points.
+- Omit unnecessary context — the model already sees the inputs.
 """
         )
 
         human_prompt = HumanMessagePromptTemplate.from_template(
             """
-Trade Rationale: {reason_for_trade}
+Trade Summary:
+- Ticker: {ticker} | Action: {action} | Qty: {quantity} @ ${price}
+- Portfolio Value: ${portfolio_value} | Cash: ${cash_balance}
+- Simulated Drawdown: {simulated_drawdown}
+- Correlation w/ Portfolio: {correlation_with_portfolio}
 
-Ticker: {ticker} | Action: {action} | Quantity: {quantity} @ ${price}
-Estimated Cost: ${estimated_cost}
-Portfolio Value: ${portfolio_value} | Cash Balance: ${cash_balance}
+Key Factors:
+- Rationale: {reason_for_trade}
+- Market Volatility: {volatility} | Avg Volume: {avg_volume}
+- Upcoming Events: {upcoming_events} | Sentiment: {sentiment}
+- Sector Exposure: {sector_exposure}
+- Holdings: {holdings}
+- New Position Size: {new_position_size} | New Cash: {new_cash_balance}
 
-Holdings: {holdings}
-Sector Exposure: {sector_exposure}
-Simulated New Position Size: {new_position_size}
-New Cash Balance: {new_cash_balance}
-Simulated Drawdown: {simulated_drawdown}
-
-Market Volatility: {volatility}
-Avg Volume: {avg_volume}
-Correlation with Portfolio: {correlation_with_portfolio}
-Upcoming Events: {upcoming_events}
-Sentiment: {sentiment}
+Risk Summary:
+- Key Risks: {key_risks}
+- Opportunities: {risk_opportunities}
+- Indicators: {volatility_indicators}
+- Flags: {financial_flags}
+- News Themes: {negative_news_themes}
+- Overall Risk: {overall_risk_assessment}
 
 Previous Debate:
-- Conservative Analyst: {current_safe_response}
-- Neutral Analyst: {current_neutral_response}
+- Conservative: {current_safe_response}
+- Neutral: {current_neutral_response}
 - History: {history}
 
-Your task is to debate why this high-reward trade is the optimal move.
-Emphasize upside potential, innovation, and bold returns. Address concerns with data-driven confidence.
-Avoid formatting and write naturally as if debating peers.
+Your Task:
+Make a concise bullet-point case for why this trade is a smart, aggressive move.
+Emphasize growth, catalysts, and why risks are worth taking.
 """
         )
 

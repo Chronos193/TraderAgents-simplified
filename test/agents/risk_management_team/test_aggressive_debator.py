@@ -1,44 +1,47 @@
 from src.agents.risk_management_team import AggressiveDebatorAgent
+from langchain_groq import ChatGroq
 import os
 from dotenv import load_dotenv
-
 load_dotenv()
-GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+GROQ_API_KEY=os.getenv('GROQ_API_KEY')
 
+# Step 1: Create a mock LLM response (to simulate LLM behavior in tests)
+llm = ChatGroq(model="llama3-8b-8192", api_key=GROQ_API_KEY)
+
+# Step 2: Instantiate the agent
 agent = AggressiveDebatorAgent()
 
-response = agent.run({
-    "trader_decision": "Buy 100 shares of NVDA due to projected dominance in AI GPU market.",
-    "market_research_report": (
-        "NVIDIA holds 80% of the global AI chip market. "
-        "Market analysts expect 30% YoY growth in demand for AI accelerators over the next 5 years."
-    ),
-    "sentiment_report": (
-        "Social sentiment is overwhelmingly positive on Reddit, Twitter, and Seeking Alpha. "
-        "Many retail traders expect NVDA to outperform earnings expectations."
-    ),
-    "news_report": (
-        "NVIDIA announced a multi-billion dollar partnership with Microsoft and Meta "
-        "to supply next-gen GPUs for their AI data centers."
-    ),
-    "fundamentals_report": (
-        "NVIDIA reported record revenue growth in Q2, with 45% YoY increase. "
-        "Profit margins remain high, and cash reserves are strong."
-    ),
-    "history": "",
-    "current_safe_response": (
-        "This trade may be overexposed to AI hype. Valuation is already high, "
-        "and any earnings miss could result in a sharp correction."
-    ),
-    "current_neutral_response": (
-        "NVDA is fundamentally strong, but entering now carries short-term volatility risk. "
-        "Waiting for a pullback might be safer."
-    )
-})
+# Step 3: Sample input to match placeholders in the human prompt
+sample_input = {
+    "reason_for_trade": "Strong AI chip demand, NVDA breaking out technically",
+    "ticker": "NVDA",
+    "action": "BUY",
+    "quantity": 100,
+    "price": 115,
+    "estimated_cost": 11500,
+    "portfolio_value": 60000,
+    "cash_balance": 20000,
+    "holdings": "AAPL, MSFT, TSLA",
+    "sector_exposure": "Tech: 60%, Healthcare: 20%, Energy: 20%",
+    "new_position_size": 0.17,
+    "new_cash_balance": 8500,
+    "simulated_drawdown": 0.08,
+    "volatility": 0.27,
+    "avg_volume": "25M",
+    "correlation_with_portfolio": 0.6,
+    "upcoming_events": "Q2 Earnings Call",
+    "sentiment": "Positive institutional flow",
+    "key_risks": "['Export restrictions', 'China tensions']",
+    "risk_opportunities": "['Data center growth', 'AI chip leadership']",
+    "volatility_indicators": "{'rsi': 71.2, 'macd': 2.3}",
+    "financial_flags": "{'debt_levels': 0.25, 'cash_reserves': 12000000000.0}",
+    "negative_news_themes": "['US-China chip regulation tension']",
+    "overall_risk_assessment": "Moderate risk, with strong upside potential",
+    "current_safe_response": "This is too risky. Suggest holding cash and waiting post-earnings.",
+    "current_neutral_response": "Position size should be trimmed to 50 shares. Wait for clarity.",
+    "history": "Last aggressive stance yielded a strong win on AMD. Risk tolerance increased slightly."
+}
 
-print("💥 Aggressive Debator says:\n")
-print(response)
-
-# 🔍 Token and Cost Usage
-print(f"\n📊 Tokens Used: {agent.get_total_tokens_used()}")
-print(f"💸 Estimated Cost: ${agent.get_total_cost():.6f}")
+# Step 4: Run the agent and print response
+response = agent.run(sample_input)
+print("📣 Aggressive Debator Output:\n", response.strip())

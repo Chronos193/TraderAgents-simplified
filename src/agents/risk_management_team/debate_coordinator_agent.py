@@ -1,18 +1,15 @@
 import json
-import re
-from typing import Dict, List, Literal, Optional, TypedDict
-from src.schemas.risk_manager_schemas.risk_manager_schema import DebateCoordinatorOutput, FinalDecision, AnalystResponse
+import time
+from typing import Dict, List
 from langchain_groq import ChatGroq
+from langchain_core.output_parsers import PydanticOutputParser
+from src.schemas.risk_manager_schemas.risk_manager_schema import DebateCoordinatorOutput
 from src.agents.risk_management_team import (
     AggressiveDebatorAgent,
     ConservativeDebatorAgent,
-    NeutralDebatorAgent,
+    NeutralDebatorAgent
 )
-import time
-from langchain_core.output_parsers import PydanticOutputParser
-# ---------------------
-# Coordinator Class
-# ---------------------
+
 class DebateCoordinatorAgent:
     def __init__(self, n_rounds: int = 2):
         self.n_rounds = n_rounds
@@ -20,8 +17,15 @@ class DebateCoordinatorAgent:
         self.conservative = ConservativeDebatorAgent()
         self.neutral = NeutralDebatorAgent()
         self.summarizer_llm = ChatGroq(model="llama3-8b-8192")
+        # ✅ Lazy import to avoid circular import
+        from .summarizer_risk_management import RiskSummarizerAgent
+        self.risk_summarizer = RiskSummarizerAgent(llm=self.summarizer_llm)  # ✅ Add summarizer instance
 
     def run_debate(self, inputs: Dict) -> DebateCoordinatorOutput:
+        # ✅ Inject structured risk summary into debate inputs
+        risk_summary = self.risk_summarizer.run(inputs)
+        inputs.update(risk_summary.model_dump())  # flatten into input dict
+
         history: List[str] = []
         aggressive_response = ""
         conservative_response = ""
@@ -59,8 +63,8 @@ class DebateCoordinatorAgent:
 
         # ✅ Use Pydantic parser
         parser = PydanticOutputParser(pydantic_object=DebateCoordinatorOutput)
-
         format_instructions = parser.get_format_instructions()
+
         print("=====================================Conservative_response=============================================")
         print(conservative_response)
         print("=====================================Neutral_response=============================================")
@@ -98,7 +102,6 @@ Provide:
 Please return your answer in **valid JSON format** with this structure:
 {format_instructions}
 """
-
 
         summary_response = self.summarizer_llm.invoke(summary_prompt)
 

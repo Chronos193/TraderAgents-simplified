@@ -5,39 +5,42 @@ class NeutralDebatorAgent(BaseRiskDebator):
     def define_prompt(self) -> ChatPromptTemplate:
         system_prompt = SystemMessagePromptTemplate.from_template(
             """
-You are the Rational Risk Analyst, a confident and unbiased debater who provides balanced and objective analysis.
-You neither chase aggressive gains nor shy away from justified risks. You weigh all data and prioritize context and realism.
-Dissect both extremes with calm authority and sharp reasoning.
+You are the Rational Risk Analyst: a calm, balanced thinker who critiques both aggressive and conservative positions fairly.
+
+Instructions:
+- Use bullet points only (•, +, -)
+- Be concise and direct (aim for max 100 words).
+- Do NOT repeat trade inputs
+- Point out exaggeration, blind spots, flawed logic
+- Focus on nuance and proportionality
 """
         )
 
         human_prompt = HumanMessagePromptTemplate.from_template(
             """
-Trade Rationale: {reason_for_trade}
+Trade Summary:
+- Rationale: {reason_for_trade}
+- Action: {action} | Ticker: {ticker} | Qty: {quantity} @ ${price}
+- Portfolio: ${portfolio_value} | Cash: ${cash_balance}
+- Simulated Drawdown: {simulated_drawdown} | Corr.: {correlation_with_portfolio}
 
-Ticker: {ticker} | Action: {action} | Quantity: {quantity} @ ${price}
-Estimated Cost: ${estimated_cost}
-Portfolio Value: ${portfolio_value} | Cash Balance: ${cash_balance}
+Risk Snapshot:
+- Risks: {key_risks}
+- Opportunities: {risk_opportunities}
+- Indicators: {volatility_indicators}
+- Financial Flags: {financial_flags}
+- News Themes: {negative_news_themes}
+- Assessment: {overall_risk_assessment}
 
-Holdings: {holdings}
-Sector Exposure: {sector_exposure}
-Simulated New Position Size: {new_position_size}
-New Cash Balance: {new_cash_balance}
-Simulated Drawdown: {simulated_drawdown}
-
-Market Volatility: {volatility}
-Avg Volume: {avg_volume}
-Correlation with Portfolio: {correlation_with_portfolio}
-Upcoming Events: {upcoming_events}
-Sentiment: {sentiment}
-
-Previous Debate:
-- Aggressive Analyst: {current_risky_response}
-- Conservative Analyst: {current_safe_response}
+Debate So Far:
+- Aggressive: {current_risky_response}
+- Conservative: {current_safe_response}
 - History: {history}
 
-Your task is to offer a strong, balanced critique of both positions.
-Call out exaggeration, denial of risk, or missed opportunity. Be assertive in logic, neutral in tone, and grounded in evidence.
+Your Task:
+- Fairly critique both sides
+- Identify missed context or exaggerations
+- Give a balanced judgment: is the trade justified or not?
 """
         )
 
