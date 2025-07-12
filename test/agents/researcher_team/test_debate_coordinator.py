@@ -4,6 +4,7 @@ from src.agents.researcher_team import DebateCoordinator, BullishResearcher, Bea
 from src.schemas.researcher_schemas import DebateTurn, DebateResult, BullishThesisOutput
 
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import os
 
@@ -11,14 +12,17 @@ load_dotenv()
 
 # ✅ 1. Load your Gemini API key
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GOOGLE_API_KEY:
     raise ValueError("❌ GOOGLE_API_KEY not found in environment. Please set it!")
 
 # ✅ 2. Create Gemini LLM instance
 llm = ChatGoogleGenerativeAI(
-    model="gemini-pro",
+    model="gemini-1.5-flash",
     google_api_key=GOOGLE_API_KEY
 )
+
+#llm = ChatGroq(model="llama3-8b-8192", api_key=GROQ_API_KEY)
 
 # ✅ 3. Instantiate researchers (same structure)
 bullish_researcher = BullishResearcher(ticker="AAPL", llm=llm)

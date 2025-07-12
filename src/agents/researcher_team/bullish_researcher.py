@@ -1,39 +1,39 @@
-from abc import ABC, abstractmethod
-from typing import List, Dict
-from pydantic import BaseModel
+from typing import Dict
 from langchain_core.language_models import BaseChatModel
 from langchain_core.runnables import RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain_community.callbacks.manager import get_openai_callback
-from langchain.memory import ConversationBufferMemory
-import re
 from src.agents.researcher_team import Researcher
 from src.schemas.researcher_schemas import BullishThesisOutput
+import re
 
 class BullishResearcher(Researcher):
     def __init__(self, ticker: str, llm: BaseChatModel):
         super().__init__(ticker, llm)
 
     def generate_thesis(self, summary_bundle: Dict[str, str]) -> BullishThesisOutput:
-        prompt = ChatPromptTemplate.from_messages([
-            SystemMessagePromptTemplate.from_template(
-                "You are a bullish financial researcher who analyzes upside potential in stocks."
-            ),
-            HumanMessagePromptTemplate.from_template(
-                """
-                Construct a bullish investment thesis for {ticker} based on the following summaries:
-                📊 Technical: {technical}
-                🧠 Sentiment: {sentiment}
-                📰 News: {news}
-                📈 Fundamentals: {fundamental}
+        system_msg = (
+            "You are a bullish financial analyst in a debate.\n"
+            "Output format:\n"
+            "1. First line: A bolded one-line bullish thesis.\n"
+            "2. Then 2–3 numbered bullet points, max 20 words each.\n"
+            "3. Final line: Confidence: <float from 0.0 to 1.0>\n\n"
+            "Write concisely, avoid fluff. Stay under 100 words total. Do not invent facts."
+        )
 
-                Provide:
-                1. A short 1-line bullish thesis
-                2. 2–3 supporting points (bulleted)
-                3. A confidence score (0.0–1.0)
-                """
-            )
+        human_template = (
+            "Make a bullish case for {ticker}.\n\n"
+            "Provided data:\n"
+            "📊 Technical: {technical}\n"
+            "🧠 Sentiment: {sentiment}\n"
+            "📰 News: {news}\n"
+            "📈 Fundamentals: {fundamental}"
+        )
+
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessagePromptTemplate.from_template(system_msg),
+            HumanMessagePromptTemplate.from_template(human_template)
         ])
 
         inputs = {
@@ -45,6 +45,7 @@ class BullishResearcher(Researcher):
         }
 
         chain = prompt | self.llm | StrOutputParser()
+
         with get_openai_callback() as cb:
             response = chain.invoke(inputs)
             self._last_token_count = cb.total_tokens
@@ -54,11 +55,23 @@ class BullishResearcher(Researcher):
 
         lines = response.strip().split("\n")
         lines = [line.strip() for line in lines if line.strip()]
-        thesis = lines[0]
-        supporting_points = [line.strip("-* ") for line in lines[1:] if not "confidence" in line.lower()]
-        confidence_line = next((line for line in lines if "confidence" in line.lower()), "")
-        match = re.search(r"([01](\.\d+)?)", confidence_line)
-        confidence = float(match.group(1)) if match else 0.5
+
+        # Thesis: remove markdown if bolded
+        thesis = re.sub(r"\*\*(.*?)\*\*", r"\1", lines[0])
+
+        # Extract supporting bullet points
+        supporting_points = []
+        for line in lines[1:4]:
+            point = re.sub(r"^\d+[\.\)]\s*", "", line)
+            supporting_points.append(point.strip())
+
+        # Extract confidence score
+        confidence = 0.5
+        for line in lines:
+            if "confidence" in line.lower():
+                match = re.search(r"([01](\.\d+)?)", line)
+                if match:
+                    confidence = float(match.group(1))
 
         return BullishThesisOutput(
             ticker=self.ticker,
