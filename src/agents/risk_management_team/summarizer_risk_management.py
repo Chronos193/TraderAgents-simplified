@@ -43,16 +43,16 @@ Schema:
 
         human_prompt = HumanMessagePromptTemplate.from_template(
             """Fundamentals Report:
-{fundamentals}
+{fundamentals_analysis}
 
 Technical Report:
-{technical}
+{technical_analysis}
 
 News Report:
-{news}
+{news_analysis}
 
 Sentiment Report:
-{sentiment}
+{sentiment_analysis}
 
 Summarize risk data for ticker: {ticker}."""
         )
@@ -95,15 +95,23 @@ Summarize risk data for ticker: {ticker}."""
 
         Expects:
             state: dict with keys:
-                - fundamentals
-                - technical
-                - news
-                - sentiment
+                - fundamentals_analysis
+                - technical_analysis
+                - news_analysis
+                - sentiment_analysis
                 - ticker
 
         Returns:
             dict with key:
                 - "risk_summary": RiskSummaryOutput
         """
-        result: RiskSummaryOutput = self.run(state)
+        inputs = {
+            "fundamentals_analysis": state["fundamentals_analysis"],
+            "technical_analysis": state["technical_analysis"],
+            "news_analysis": state["news_analysis"],
+            "sentiment_analysis": state["sentiment_analysis"],
+            "ticker": state["ticker"]
+        }
+        result: RiskSummaryOutput = self.run(inputs)
         return {**state, "risk_summary": result}
+

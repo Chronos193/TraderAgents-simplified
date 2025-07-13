@@ -26,29 +26,30 @@ Your goals:
 
         human_prompt = HumanMessagePromptTemplate.from_template(
             """
-Trade Summary:
-- Ticker: {ticker} | Action: {action} | Qty: {quantity} @ ${price}
-- Rationale: {reason_for_trade}
-- Portfolio: ${portfolio_value} | Cash: ${cash_balance}
-- Drawdown: {simulated_drawdown} | Correlation: {correlation_with_portfolio}
+🧾 Trade Context:
+- Ticker: {ticker} | Quantity: {quantity} @ ${price}
+- Portfolio Value: ${portfolio_value} | Cash: ${cash_balance}
+- New Position Size: {new_position_size} | New Cash: {new_cash_balance}
+- Simulated Drawdown: {simulated_drawdown}
 
-Risk Snapshot:
+📉 Risk Snapshot:
+- Volatility: {volatility} | Sentiment: {sentiment}
+- Risk Indicators: {volatility_indicators}
+- Financial Flags: {financial_flags}
 - Key Risks: {key_risks}
-- Risk Opportunities: {risk_opportunities}
-- Indicators: {volatility_indicators}
-- Flags: {financial_flags}
+- Opportunities: {risk_opportunities}
 - News Themes: {negative_news_themes}
-- Assessment: {overall_risk_assessment}
+- Overall Assessment: {overall_risk_assessment}
 
-Debate So Far:
+🧠 Prior Arguments:
 - Aggressive: {current_risky_response}
 - Conservative: {current_safe_response}
 - History: {history}
 
-Your Task:
-- Critique both positions clearly and fairly.
-- Identify weak arguments, good logic, and overlooked risks.
-- State whether the trade is justified or not.
+🎯 Your Task:
+- Fairly critique both positions.
+- Identify weak logic or exaggerations.
+- Suggest if the trade is reasonable or if caution is warranted.
 """
         )
 
@@ -74,7 +75,18 @@ Your Task:
             return state
 
         response = self.run_analysis(state)
-        return {**state, "neutral_debate_response": response}
+
+        # Append to history (used by DebateCoordinatorAgent)
+        history = state.get("history", [])
+        history.append("Neutral: " + response)
+
+        return {
+            **state,
+            "neutral_debate_response": response,
+            "current_neutral_response": response,   # ✅ Used by Aggressive & Conservative
+            "history": history                      # ✅ Used by DebateCoordinator
+        }
+
 
     def as_runnable_node(self) -> RunnableLambda:
         return RunnableLambda(self.__call__)

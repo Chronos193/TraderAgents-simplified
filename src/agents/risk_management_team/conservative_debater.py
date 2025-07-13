@@ -26,38 +26,33 @@ Your goals:
             ),
             HumanMessagePromptTemplate.from_template(
                 """
-Trade Summary:
-- Ticker: {ticker} | Action: {action} | Qty: {quantity} @ ${price}
-- Portfolio Value: ${portfolio_value} | Cash: ${cash_balance}
-- Simulated Drawdown: {simulated_drawdown}
-- Correlation: {correlation_with_portfolio}
+Ticker: {ticker}
+Quantity: {quantity} @ ${price}
+Portfolio: ${portfolio_value} | Cash: ${cash_balance}
+New Position Size: {new_position_size} | New Cash: {new_cash_balance}
+Simulated Drawdown: {simulated_drawdown}
 
-Key Inputs:
-- Rationale: {reason_for_trade}
-- Market Volatility: {volatility}
-- Avg Volume: {avg_volume}
-- Sentiment: {sentiment}
+Market:
+- Volatility: {volatility} | Volume: {avg_volume} | Sentiment: {sentiment}
 - Sector Exposure: {sector_exposure}
 - Holdings: {holdings}
-- New Position Size: {new_position_size}
-- New Cash: {new_cash_balance}
 
 Risk Summary:
 - Key Risks: {key_risks}
 - Risk Opportunities: {risk_opportunities}
-- Indicators: {volatility_indicators}
+- Volatility Indicators: {volatility_indicators}
 - Financial Flags: {financial_flags}
 - News Themes: {negative_news_themes}
 - Overall Risk: {overall_risk_assessment}
 
-Previous Debate:
+Debate Context:
 - Aggressive: {current_risky_response}
 - Neutral: {current_neutral_response}
 - History: {history}
 
 Your Task:
 Call out major risk concerns in bullet points.
-Be direct. Recommend safer alternatives where appropriate.
+Be direct. Recommend safer alternatives if necessary.
 """
             )
         ])
@@ -82,7 +77,18 @@ Be direct. Recommend safer alternatives where appropriate.
             return state
 
         response = self.run_analysis(state)
-        return {**state, "conservative_debate_response": response}
+
+        # Append to history (used by NeutralDebator)
+        history = state.get("history", [])
+        history.append("Conservative: " + response)
+
+        return {
+            **state,
+            "conservative_debate_response": response,
+            "current_safe_response": response,    # ✅ Used by Aggressive & Neutral
+            "history": history                    # ✅ Required downstream
+        }
+
 
     def as_runnable_node(self) -> RunnableLambda:
         return RunnableLambda(self.__call__)

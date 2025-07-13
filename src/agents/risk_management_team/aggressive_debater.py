@@ -26,36 +26,33 @@ Your job:
             ),
             HumanMessagePromptTemplate.from_template(
                 """
-Trade Summary:
-- Ticker: {ticker} | Action: {action} | Qty: {quantity} @ ${price}
-- Portfolio Value: ${portfolio_value} | Cash: ${cash_balance}
-- Simulated Drawdown: {simulated_drawdown}
-- Correlation w/ Portfolio: {correlation_with_portfolio}
+Ticker: {ticker}
+Trade Size: {quantity} shares @ ${price}
+New Position Size: {new_position_size} | New Cash: {new_cash_balance}
+Portfolio: ${portfolio_value} | Cash: ${cash_balance}
 
-Key Factors:
-- Rationale: {reason_for_trade}
-- Market Volatility: {volatility} | Avg Volume: {avg_volume}
-- Upcoming Events: {upcoming_events} | Sentiment: {sentiment}
-- Sector Exposure: {sector_exposure}
-- Holdings: {holdings}
-- New Position Size: {new_position_size} | New Cash: {new_cash_balance}
+Market:
+- Volatility: {volatility} | Volume: {avg_volume} | Sentiment: {sentiment}
+
+Holdings: {holdings}
+Sector Exposure: {sector_exposure}
+
+Simulated Drawdown: {simulated_drawdown}
 
 Risk Summary:
 - Key Risks: {key_risks}
 - Opportunities: {risk_opportunities}
-- Indicators: {volatility_indicators}
-- Flags: {financial_flags}
-- News Themes: {negative_news_themes}
-- Overall Risk: {overall_risk_assessment}
+- Volatility Indicators: {volatility_indicators}
+- Financial Flags: {financial_flags}
+- News Risks: {negative_news_themes}
+- Risk Level: {overall_risk_assessment}
 
-Previous Debate:
+Debate Context:
 - Conservative: {current_safe_response}
 - Neutral: {current_neutral_response}
 - History: {history}
 
-Your Task:
-Make a bold but concise bullet-point case for why this is a smart, aggressive move.
-Emphasize growth, catalysts, and why the risk is worth it.
+Make a bold case for why this is a smart, aggressive move.
 """
             )
         ])
@@ -80,7 +77,17 @@ Emphasize growth, catalysts, and why the risk is worth it.
             return state
 
         response = self.run_analysis(state)
-        return {**state, "aggressive_debate_response": response}
 
+        # Append to history (optional but useful for prompt context)
+        history = state.get("history", [])
+        history.append("Aggressive: " + response)
+
+        return {
+            **state,
+            "aggressive_debate_response": response,
+            "current_risky_response": response,   # ✅ Required by Conservative & Neutral
+            "history": history                    # ✅ Required by all debators
+        }
+    
     def as_runnable_node(self) -> RunnableLambda:
         return RunnableLambda(self.__call__)
