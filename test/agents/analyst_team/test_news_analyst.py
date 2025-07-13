@@ -1,31 +1,35 @@
-from langgraph.graph import StateGraph, END
-from pydantic import BaseModel
-from typing import Optional
-from src.agents.analyst_team import NewsAnalyst
+from langgraph.graph import StateGraph
 from langchain_groq import ChatGroq
-from dotenv import load_dotenv
+from src.agents.analyst_team.news_analyst import NewsAnalyst
+from src.schemas.analyst_schemas import NewsAnalysisOutput
+from langgraph.graph import END
+import json
 import os
-
+from dotenv import load_dotenv
 load_dotenv()
-finnhub_api_key = os.getenv('FINNHUB_API_KEY')
-groq_api_key = os.getenv('GROQ_API_KEY')
-
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# ---- Initialize LLM ----
 llm = ChatGroq(model="llama3-8b-8192", temperature=0.1)
-analyst = NewsAnalyst("AAPL", llm)
 
-class GraphState(BaseModel):
-    news: Optional[dict] = None
+# ---- Instantiate NewsAnalyst agent ----
+news_agent = NewsAnalyst(llm=llm)
 
-def wrap_news_output(state: GraphState) -> GraphState:
-    output = analyst.structured_analyze()
-    return GraphState(news=output.model_dump())
+# ---- Build a minimal test graph ----
+workflow = StateGraph(state_schema=dict)
+workflow.add_node("news_analysis", news_agent)
+workflow.set_entry_point("news_analysis")
+workflow.add_edge("news_analysis", END)
+graph = workflow.compile()
 
-graph = StateGraph(GraphState)
-graph.add_node("news_analysis", wrap_news_output)
-graph.set_entry_point("news_analysis")
-graph.add_edge("news_analysis", END)
-app = graph.compile()
+# ---- Provide test input ----
+if __name__ == "__main__":
+    test_state = {
+        "ticker": "AAPL"
+    }
 
-result = app.invoke(GraphState())
-print("📊 News Analysis:", result['news'])
-print("🧾 Tokens Used:", analyst.get_last_token_count())
+    print("🚀 Running NewsAnalyst test workflow...\n")
+    result = graph.invoke(test_state)
+
+    print("\n✅ Final output:")
+    print(json.dumps(result["news_analysis"].dict(), indent=2))

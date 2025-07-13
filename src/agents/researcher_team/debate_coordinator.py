@@ -1,57 +1,34 @@
+from typing import Dict
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnableLambda
 from langchain_community.callbacks.manager import get_openai_callback
 from src.schemas.researcher_schemas import DebateResult, DebateTurn
 import re
 
 
 class DebateCoordinator:
-    """
-    DebateCoordinator runs a multi-round debate between a bullish and bearish debater
-    on a given stock ticker. It maintains a rolling summary to preserve context
-    while keeping token usage manageable.
-    """
-
-    def __init__(self, ticker: str, llm: BaseChatModel):
-        """
-        :param ticker: The stock ticker symbol.
-        :param llm: The language model to use (must inherit BaseChatModel).
-        """
-        self.ticker = ticker
+    def __init__(self, llm: BaseChatModel):
         self.llm = llm
 
     def _generate_response(self, summary: str, latest_argument: str, speaker: str) -> DebateTurn:
-        """
-        Generate a single debater's response given the rolling summary
-        and the opponent's latest argument.
-
-        :param summary: Rolling summary of debate so far.
-        :param latest_argument: Opponent's last turn.
-        :param speaker: "Bullish" or "Bearish".
-        :return: DebateTurn
-        """
-        system = f"""
-        You are a {speaker.lower()} financial debater.
-
-        Debate so far:
-        {summary}
-
-        Your task:
-        - Respond to the opponent's latest arguments point-by-point.
-        - Address each numbered point directly.
-        - Keep your tone confident and assertive, not aggressive.
-        - Do not repeat your own arguments unless needed to counter.
-        - Limit to about 250 words.
-        """
+        system = (
+            f"You are a {speaker.lower()} financial debater.\n\n"
+            f"Debate so far:\n{summary}\n\n"
+            "Your task:\n"
+            "- Respond to the opponent's latest arguments point-by-point.\n"
+            "- Address each numbered point directly.\n"
+            "- Keep your tone confident and assertive, not aggressive.\n"
+            "- Do not repeat your own arguments unless needed to counter.\n"
+            "- Limit to about 250 words."
+        )
 
         chain = (
             ChatPromptTemplate.from_messages([
                 SystemMessagePromptTemplate.from_template(system),
                 HumanMessagePromptTemplate.from_template("{input}")
-            ])
-            | self.llm
-            | StrOutputParser()
+            ]) | self.llm | StrOutputParser()
         )
 
         with get_openai_callback() as cb:
@@ -61,13 +38,6 @@ class DebateCoordinator:
         return DebateTurn(speaker=speaker, message=response.strip(), tokens_used=tokens)
 
     def _update_summary(self, old_summary: str, new_turn: DebateTurn) -> str:
-        """
-        Update the rolling summary with a new turn.
-
-        :param old_summary: Current summary.
-        :param new_turn: New DebateTurn to incorporate.
-        :return: Updated summary.
-        """
         summarizer_prompt = ChatPromptTemplate.from_messages([
             SystemMessagePromptTemplate.from_template("""
                 You are a neutral financial debate summarizer.
@@ -76,56 +46,35 @@ class DebateCoordinator:
                 Limit to about 100 words.
             """),
             HumanMessagePromptTemplate.from_template(
-                """
-                Previous Summary:
-                {summary}
-
-                New Turn:
-                {turn}
-                """
+                "Previous Summary:\n{summary}\n\nNew Turn:\n{turn}"
             )
         ])
-
         chain = summarizer_prompt | self.llm | StrOutputParser()
-        with get_openai_callback() as cb:
-            updated_summary = chain.invoke({
+
+        with get_openai_callback():
+            return chain.invoke({
                 "summary": old_summary,
                 "turn": f"{new_turn.speaker}: {new_turn.message}"
-            })
+            }).strip()
 
-        return updated_summary.strip()
-
-    def conduct_debate(self, bullish_thesis: str, bearish_thesis: str, rounds: int = 3) -> DebateResult:
-        """
-        Run the full multi-round debate and return results.
-
-        :param bullish_thesis: Initial bullish opening statement.
-        :param bearish_thesis: Initial bearish opening statement.
-        :param rounds: Number of back-and-forth rounds.
-        :return: DebateResult
-        """
+    def conduct_debate(self, ticker: str, bullish_thesis: str, bearish_thesis: str, rounds: int = 2) -> DebateResult:
         turns = []
         prompt_bull = bullish_thesis
         prompt_bear = bearish_thesis
-
         summary_so_far = ""
 
-        for r in range(rounds):
-            # Bullish turn
+        for _ in range(rounds):
             bull_turn = self._generate_response(summary_so_far, prompt_bear, "Bullish")
             turns.append(bull_turn)
             summary_so_far = self._update_summary(summary_so_far, bull_turn)
 
-            # Bearish turn
             bear_turn = self._generate_response(summary_so_far, bull_turn.message, "Bearish")
             turns.append(bear_turn)
             summary_so_far = self._update_summary(summary_so_far, bear_turn)
 
-            # Next round's prompts
             prompt_bull = bull_turn.message
             prompt_bear = bear_turn.message
 
-        # Final summary + winner
         summary_prompt = ChatPromptTemplate.from_messages([
             SystemMessagePromptTemplate.from_template("""
                 You are a neutral financial analyst summarizing a stock debate.
@@ -137,30 +86,29 @@ class DebateCoordinator:
                 - Persuasiveness
 
                 Decide the winner: Bullish, Bearish, or Tie.
-
-                At the end, state the winner exactly as:
-                "Winner: Bullish"
+                While deciding the winner:
+                - Carefully analyze the scores of Logic, Evidence, and Persuasiveness.
+                - If one side has higher scores in at least 2 out of 3 categories, declare them the winner.
+                - Avoid declaring a tie unless the scores and arguments are nearly equal in all dimensions.
+                At the end, **state the winner exactly as:**
+                Winner: Bullish  --OR--  Winner: Bearish  --OR--  Winner: Tie
             """),
             HumanMessagePromptTemplate.from_template(
-                """
-                Summarize the debate about {ticker}.
-
-                Debate Transcript:
-                {transcript}
-                """
+                "Summarize the debate about {ticker}.\n\nDebate Transcript:\n{transcript}"
             )
         ])
 
-        transcript = "\n\n".join([f"{turn.speaker}: {turn.message}" for turn in turns])
-        summary_inputs = {"ticker": self.ticker, "transcript": transcript}
+        transcript = "\n\n".join(f"{turn.speaker}: {turn.message}" for turn in turns)
+        inputs = {"ticker": ticker, "transcript": transcript}
 
         with get_openai_callback() as cb:
             summary_chain = summary_prompt | self.llm | StrOutputParser()
-            result = summary_chain.invoke(summary_inputs)
+            result = summary_chain.invoke(inputs)
             summary_tokens = cb.total_tokens
 
-        winner_match = re.search(r"winner\s*[:\-]?\s*(bullish|bearish|tie)", result, re.IGNORECASE)
+        winner_match = re.search(r"\**\bwinner\b\**\s*[:\-]?\s*(bullish|bearish|tie)", result, re.IGNORECASE)
         winner = winner_match.group(1).capitalize() if winner_match else "Tie"
+
 
         return DebateResult(
             turns=turns,
@@ -168,3 +116,22 @@ class DebateCoordinator:
             winner=winner,
             total_tokens=sum(t.tokens_used for t in turns) + summary_tokens
         )
+
+    def __call__(self, state: Dict) -> Dict:
+        ticker = state.get("ticker")
+        bullish = state.get("bullish_thesis")
+        bearish = state.get("bearish_thesis")
+
+        if not ticker or not bullish or not bearish:
+            print("[WARN] DebateCoordinator missing input.")
+            return {**state, "research_debate_result": None}
+
+        debate_result = self.conduct_debate(
+            ticker,
+            bullish.thesis,
+            bearish.thesis
+        )
+        return {**state, "research_debate_result": debate_result}
+
+    def as_runnable_node(self) -> RunnableLambda:
+        return RunnableLambda(lambda state: self.__call__(state))

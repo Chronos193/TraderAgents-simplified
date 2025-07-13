@@ -8,7 +8,7 @@ class RiskSummaryOutput(BaseModel):
 
     risk_opportunities: List[str] = Field(..., description="Opportunities with potential reward despite risks")
 
-    volatility_indicators: Optional[Dict[str, float]] = None
+    volatility_indicators: Optional[Dict[str, Optional[float]]] = None
 
     financial_flags: Optional[Dict[str, float]] = None
 

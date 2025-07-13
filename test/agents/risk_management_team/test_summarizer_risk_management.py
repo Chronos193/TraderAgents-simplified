@@ -1,47 +1,67 @@
+from langgraph.graph import StateGraph
 from langchain_groq import ChatGroq
-from src.agents.risk_management_team.summarizer_risk_management import RiskSummarizerAgent
-import os
 from dotenv import load_dotenv
-from pprint import pprint
+import os
 
+from src.agents.risk_management_team import RiskSummarizerAgent
+
+# --------------------------
+# ✅ Load .env + Groq key
+# --------------------------
 load_dotenv()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    raise ValueError("❌ GROQ_API_KEY not found in .env")
 
-# Initialize the LLM
-llm = ChatGroq(model="llama3-8b-8192")  # or any other ChatModel supported
+llm = ChatGroq(model="llama3-8b-8192", api_key=GROQ_API_KEY, temperature=0.3)
 
-# Instantiate the summarizer agent
-agent = RiskSummarizerAgent(llm=llm)
+# --------------------------
+# ✅ Create summarizer node
+# --------------------------
+summarizer_node = RiskSummarizerAgent(llm=llm)
 
-# Sample test input (minimal and clean)
-sample_input = {
-    "ticker": "TSLA",
+# --------------------------
+# ✅ Create LangGraph wrapper
+# --------------------------
+graph = StateGraph(state_schema=dict)
+graph.add_node("summarize_risk", summarizer_node)
+graph.set_entry_point("summarize_risk")
+graph.set_finish_point("summarize_risk")
+pipeline = graph.compile()
 
+# --------------------------
+# ✅ Mock input state
+# --------------------------
+mock_state = {
+    "ticker": "MSFT",
     "fundamentals": (
-        "Tesla reported 12% YoY revenue growth and stable 9.6% operating margins. "
-        "Free cash flow dropped 15% due to capex in gigafactories. "
-        "Debt is low, cash reserves are $12B, inventory days rose slightly."
+        "Revenue grew 7%, but cloud segment slowed. Free cash flow stable. "
+        "R&D up 12%, but debt slightly increased. PE ratio at 29."
     ),
-
     "technical": (
-        '{"macd": 1.34, "signal": 1.10, "histogram": 0.24, '
-        '"rsi": 74.8, "recommendation": "Sell - Overbought on RSI, MACD flattening"}'
+        "RSI at 71, indicating overbought. MACD shows weakening bullish momentum. "
+        "Stock above 50 and 200 DMA. Slight divergence noted."
     ),
-
     "news": (
-        '"Tesla Recalls 300K Vehicles Due to Autopilot Issues"\n'
-        '"New Gigafactory in Mexico Expected to Boost Output"\n'
-        '"EU Regulators Scrutinize Tesla\'s Data Privacy Practices"\n\n'
-        "Themes: Regulatory risk on autonomy/data, expansion despite headwinds"
+        "SEC is investigating MSFT's cloud contracts. Antitrust concerns in EU. "
+        "Positive press on AI collaboration with OpenAI."
     ),
-
     "sentiment": (
-        '"Tesla criticized over autopilot failures, fans remain loyal."\n'
-        '"Investor outlook mixed; institutions cautious, retail optimistic."\n\n'
-        "Summary: Overall sentiment slightly negative due to recalls and regulation."
-    ),
+        "Analyst tone is optimistic. Retail sentiment high. Insider selling activity observed. "
+        "Hedge fund exposure dropped 3%."
+    )
 }
 
-# Run the agent and print the structured output
-output = agent.run(sample_input)
+# --------------------------
+# ✅ Run test
+# --------------------------
+if __name__ == "__main__":
+    print("🧪 Running RiskSummarizerAgent with mock data...")
+    result = pipeline.invoke(mock_state)
 
-pprint(output.model_dump())
+    risk_summary = result.get("risk_summary")
+    if risk_summary:
+        print("\n✅ Risk Summary Output:")
+        print(risk_summary.model_dump_json(indent=2))
+    else:
+        print("❌ No risk summary returned.")

@@ -9,9 +9,8 @@ from src.schemas.analyst_schemas import FundamentalsAnalysisOutput
 
 
 class FundamentalsAnalyst(Analyst):
-    def __init__(self, ticker, llm: BaseChatModel):
-        super().__init__(ticker, llm)
-        self.stock = yf.Ticker(ticker)
+    def __init__(self, llm: BaseChatModel):
+        super().__init__( llm=llm)
         self._last_token_count = 0
 
     def _get_latest(self, df, wanted_keys):
@@ -32,25 +31,18 @@ class FundamentalsAnalyst(Analyst):
                 print(f"[WARN] Key not found: {key}")
         return summary
 
-    def structured_analyze(self) -> FundamentalsAnalysisOutput:
-
-        financials = self.stock.financials
-        balance_sheet = self.stock.balance_sheet
-        cashflow = self.stock.cashflow
-
-        #print("[DEBUG] balance_sheet columns:", list(balance_sheet.index))
-        #print("[DEBUG] cashflow columns:", list(cashflow.index))
+    def structured_analyze(self, ticker: str) -> FundamentalsAnalysisOutput:
+        stock = yf.Ticker(ticker)
+        financials = stock.financials
+        balance_sheet = stock.balance_sheet
+        cashflow = stock.cashflow
 
         financials_summary = self._get_latest(financials, ["Total Revenue", "Gross Profit", "Net Income"])
         balance_summary = self._get_latest(balance_sheet, [
-            "Total Assets", 
-            "Total Liabilities Net Minority Interest", 
-            "Stockholders Equity"
+            "Total Assets", "Total Liabilities Net Minority Interest", "Stockholders Equity"
         ])
         cashflow_summary = self._get_latest(cashflow, [
-            "Operating Cash Flow",
-            "Investing Cash Flow",
-            "Financing Cash Flow"
+            "Operating Cash Flow", "Investing Cash Flow", "Financing Cash Flow"
         ])
 
         if not any([financials_summary, balance_summary, cashflow_summary]):
@@ -58,7 +50,6 @@ class FundamentalsAnalyst(Analyst):
 
         system_msg = SystemMessagePromptTemplate.from_template(
             "You are a financial analyst. Summarize the company’s financial health, risks, and growth in 5 short bullet points each."
-
         )
         human_msg = HumanMessagePromptTemplate.from_template(
             "Give a brief summary for {ticker}. Use no more than 5 bullet points each for:\n"
@@ -71,36 +62,32 @@ class FundamentalsAnalyst(Analyst):
         prompt = ChatPromptTemplate.from_messages([system_msg, human_msg])
         chain = prompt | self.llm | StrOutputParser()
 
-        inputs = {
-            "ticker": self.ticker,
-            "financials_summary": financials_summary,
-            "balance_summary": balance_summary,
-            "cashflow_summary": cashflow_summary
-        }
-        if financials.empty:
-            print("[WARN] financials DataFrame is empty")
-        if balance_sheet.empty:
-            print("[WARN] balance_sheet DataFrame is empty")
-        if cashflow.empty:
-            print("[WARN] cashflow DataFrame is empty")
-
         with get_openai_callback() as cb:
-            analysis_text = chain.invoke(inputs)
+            analysis_text = chain.invoke({
+                "ticker": ticker,
+                "financials_summary": financials_summary,
+                "balance_summary": balance_summary,
+                "cashflow_summary": cashflow_summary
+            })
             self._last_token_count = cb.total_tokens
 
         return FundamentalsAnalysisOutput(
-            ticker=self.ticker,
+            ticker=ticker,
             financials_summary=financials_summary,
             balance_summary=balance_summary,
             cashflow_summary=cashflow_summary,
             analysis_text=analysis_text
         )
 
-    def analyze(self):
-        return self.structured_analyze().analysis_text
+    def analyze(self, ticker: str):
+        return self.structured_analyze(ticker).analysis_text
 
-    def summary(self):
-        info = self.stock.info or {}
+    def get_last_token_count(self):
+        return self._last_token_count
+
+    def summary(self, ticker: str):
+        stock = yf.Ticker(ticker)
+        info = stock.info or {}
         summary_fields = {k: info.get(k) for k in [
             "longName", "sector", "industry", "marketCap",
             "trailingPE", "dividendYield", "returnOnEquity",
@@ -122,8 +109,19 @@ class FundamentalsAnalyst(Analyst):
 
         return result
 
-    def get_last_token_count(self):
-        return self._last_token_count
-
     def as_runnable_node(self) -> RunnableLambda:
-        return RunnableLambda(lambda _: self.structured_analyze())
+        return RunnableLambda(lambda state: self.__call__(state))
+
+    def __call__(self, state: dict) -> dict:
+        ticker = state.get("ticker")
+        if not ticker:
+            print("[ERROR] Ticker missing from state.")
+            return {**state, "fundamentals_analysis": None}
+    
+        try:
+            output = self.structured_analyze(ticker)
+            return {**state, "fundamentals_analysis": output}
+        except Exception as e:
+            print(f"[ERROR] FundamentalsAnalyst failed for {ticker}: {e}")
+            return {**state, "fundamentals_analysis": None}
+

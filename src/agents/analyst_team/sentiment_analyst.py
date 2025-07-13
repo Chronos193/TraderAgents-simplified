@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from src.schemas.analyst_schemas import SentimentAnalysisOutput
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
@@ -10,21 +10,22 @@ import os
 import requests
 from datetime import datetime, timedelta, timezone
 
+
 class SentimentAnalyst(ABC):
-    def __init__(self, ticker, llm: BaseChatModel, finnhub_api_key=None):
-        self.ticker = ticker
+    def __init__(self, llm: BaseChatModel, finnhub_api_key=None):
         self.llm = llm
-        self.stock = yf.Ticker(ticker)
         self.finnhub_api_key = finnhub_api_key or os.getenv("FINNHUB_API_KEY")
         self._last_token_count = 0
 
-    def get_recent_headlines(self, max_items=7, max_len=160):
+    def get_recent_headlines(self, ticker: str, max_items=7, max_len=160):
         headlines = []
+
+        # Finnhub
         if self.finnhub_api_key:
             today = datetime.now(timezone.utc).date()
             from_date = (today - timedelta(days=30)).isoformat()
             to_date = today.isoformat()
-            url = f"https://finnhub.io/api/v1/company-news?symbol={self.ticker}&from={from_date}&to={to_date}&token={self.finnhub_api_key}"
+            url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={from_date}&to={to_date}&token={self.finnhub_api_key}"
             try:
                 resp = requests.get(url, timeout=5)
                 data = resp.json()
@@ -39,27 +40,34 @@ class SentimentAnalyst(ABC):
                     if len(headlines) >= max_items:
                         break
             except Exception as e:
-                print(f"Finnhub API error: {e}")
-                pass
+                print(f"[ERROR] Finnhub API error: {e}")
+        else:
+            print("[WARN] No FINNHUB_API_KEY provided.")
 
+        # Fallback: yfinance
         if not headlines:
-            news = getattr(self.stock, "news", [])
-            for item in news:
-                headline = item.get("title", "")[:max_len]
-                snippet = item.get("summary", "")[:max_len]
-                combined = f"{headline} -- {snippet}" if snippet else headline
-                combined_simple = combined.lower().strip()
-                if combined_simple and all(combined_simple != h.lower().strip() for h in headlines):
-                    headlines.append(combined)
-                if len(headlines) >= max_items:
-                    break
+            try:
+                stock = yf.Ticker(ticker)
+                news = getattr(stock, "news", [])
+                for item in news:
+                    headline = item.get("title", "")[:max_len]
+                    snippet = item.get("summary", "")[:max_len]
+                    combined = f"{headline} -- {snippet}" if snippet else headline
+                    combined_simple = combined.lower().strip()
+                    if combined_simple and all(combined_simple != h.lower().strip() for h in headlines):
+                        headlines.append(combined)
+                    if len(headlines) >= max_items:
+                        break
+            except Exception as e:
+                print(f"[ERROR] yfinance fallback failed: {e}")
+
         return headlines
 
-    def structured_analyze(self) -> SentimentAnalysisOutput:
-        headlines = self.get_recent_headlines()
+    def structured_analyze(self, ticker: str) -> SentimentAnalysisOutput:
+        headlines = self.get_recent_headlines(ticker)
         if not headlines:
             return SentimentAnalysisOutput(
-                ticker=self.ticker,
+                ticker=ticker,
                 headlines=[],
                 summary_text="No recent news headlines found.",
                 sentiment_text="Sentiment analysis not available due to lack of news."
@@ -80,7 +88,7 @@ class SentimentAnalyst(ABC):
         ])
 
         inputs = {
-            "ticker": self.ticker,
+            "ticker": ticker,
             "headlines": "\n".join([f"- {h}" for h in headlines])
         }
 
@@ -94,20 +102,33 @@ class SentimentAnalyst(ABC):
             self._last_token_count = cb.total_tokens
 
         return SentimentAnalysisOutput(
-            ticker=self.ticker,
+            ticker=ticker,
             headlines=headlines,
             summary_text=summary_text,
             sentiment_text=sentiment_text
         )
 
-    def analyze(self):
-        return self.structured_analyze().sentiment_text
+    def analyze(self, ticker: str):
+        return self.structured_analyze(ticker).sentiment_text
 
-    def summary(self):
-        return self.structured_analyze().summary_text
+    def summary(self, ticker: str):
+        return self.structured_analyze(ticker).summary_text
 
     def get_last_token_count(self):
         return self._last_token_count
 
     def as_runnable_node(self) -> RunnableLambda:
-        return RunnableLambda(lambda _: self.structured_analyze())
+        return RunnableLambda(lambda state: self.__call__(state))
+
+    def __call__(self, state: dict) -> dict:
+        ticker = state.get("ticker")
+        if not ticker:
+            print("[ERROR] Missing ticker in state.")
+            return {**state, "sentiment_analysis": None}
+    
+        try:
+            output = self.structured_analyze(ticker)
+            return {**state, "sentiment_analysis": output}
+        except Exception as e:
+            print(f"[ERROR] SentimentAnalyst failed for {ticker}: {e}")
+            return {**state, "sentiment_analysis": None}

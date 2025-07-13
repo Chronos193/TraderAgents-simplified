@@ -8,11 +8,12 @@ from src.agents.researcher_team import Researcher
 from langchain_core.runnables import RunnableLambda
 import re
 
-class BearishResearcher(Researcher):
-    def __init__(self, ticker: str, llm: BaseChatModel):
-        super().__init__(ticker, llm)
 
-    def generate_thesis(self, summary_bundle: Dict[str, str]) -> BearishThesisOutput:
+class BearishResearcher(Researcher):
+    def __init__(self, llm: BaseChatModel):
+        super().__init__(llm=llm)
+
+    def generate_thesis(self, ticker: str, summary_bundle: Dict[str, str]) -> BearishThesisOutput:
         system_msg = (
             "You are a bearish financial analyst in a formal debate.\n"
             "Respond in this strict format:\n"
@@ -37,7 +38,7 @@ class BearishResearcher(Researcher):
         ])
 
         inputs = {
-            "ticker": self.ticker,
+            "ticker": ticker,
             "technical": summary_bundle.get("technical", "N/A"),
             "sentiment": summary_bundle.get("sentiment", "N/A"),
             "news": summary_bundle.get("news", "N/A"),
@@ -53,32 +54,47 @@ class BearishResearcher(Researcher):
         self.memory.chat_memory.add_user_message(str(inputs))
         self.memory.chat_memory.add_ai_message(output)
 
-        lines = output.strip().split("\n")
-        lines = [line.strip() for line in lines if line.strip()]
+        lines = [line.strip() for line in output.strip().split("\n") if line.strip()]
+        thesis = re.sub(r"\*\*(.*?)\*\*", r"\1", lines[0]) if lines else "No thesis."
 
-        # First line is the thesis (strip markdown)
-        thesis = re.sub(r"\*\*(.*?)\*\*", r"\1", lines[0])
-
-        # Next 3 lines are numbered bullets
         supporting_points = []
         for line in lines[1:4]:
-            point = re.sub(r"^\d+[\.\)]\s*", "", line)  # Remove 1. or 1) prefix
+            point = re.sub(r"^\d+[\.\)]\s*", "", line)
             supporting_points.append(point.strip())
 
-        # Last line should be confidence
         confidence = 0.5
         for line in lines:
             if "confidence" in line.lower():
                 match = re.search(r"(\d+(\.\d+)?)", line)
                 if match:
                     confidence = float(match.group(1))
+                    break
 
         return BearishThesisOutput(
-            ticker=self.ticker,
+            ticker=ticker,
             thesis=thesis,
             supporting_points=supporting_points,
             confidence=round(confidence, 2)
         )
 
+    def __call__(self, state: dict) -> dict:
+        ticker = state.get("ticker")
+        if not ticker:
+            print("[ERROR] Ticker missing from state.")
+            return {**state, "bearish_thesis": None}
+        try:
+            summaries = {
+                "technical": getattr(state.get("technical_analysis"), "recommendation", "N/A"),
+                "sentiment": getattr(state.get("sentiment_analysis"), "sentiment_text", "N/A"),
+                "news": getattr(state.get("news_analysis"), "summary_text", "N/A"),
+                "fundamental": getattr(state.get("fundamentals_analysis"), "analysis_text", "N/A"),
+            }
+
+            output = self.generate_thesis(ticker, summaries)
+            return {**state, "bearish_thesis": output}
+        except Exception as e:
+            print(f"[ERROR] BearishResearcher failed: {e}")
+            return {**state, "bearish_thesis": None}
+
     def as_runnable_node(self) -> RunnableLambda:
-        return RunnableLambda(lambda _: self.generate_thesis())
+        return RunnableLambda(lambda state: self.__call__(state))

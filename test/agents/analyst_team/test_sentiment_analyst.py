@@ -1,43 +1,33 @@
-# test/agents/analyst_team/test_sentiment_analyst.py
-
+from langgraph.graph import StateGraph, END
+from langchain_groq import ChatGroq
 from src.agents.analyst_team.sentiment_analyst import SentimentAnalyst
-from src.schemas.analyst_schemas import SentimentAnalysisOutput
-from langchain_groq import ChatGroq  # ✅ Use official Groq integration from LangChain
+import json
 import os
 from dotenv import load_dotenv
+load_dotenv()
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# Step 1: Initialize LLM
+llm = ChatGroq(model="llama3-8b-8192", temperature=0.1)
 
-load_dotenv()  # Make sure GROQ_API_KEY is loaded
+# Step 2: Instantiate SentimentAnalyst agent
+sentiment_agent = SentimentAnalyst(llm=llm)
 
+# Step 3: Build minimal LangGraph with just sentiment node
+workflow = StateGraph(state_schema=dict)
+workflow.add_node("sentiment", sentiment_agent)
+workflow.set_entry_point("sentiment")
+workflow.add_edge("sentiment", END)
+graph = workflow.compile()
 
-def test_sentiment_analyst():
-    # ✅ Load your Groq API key (ensure it's set in .env or your environment)
-    groq_api_key = os.getenv("GROQ_API_KEY")
-    if not groq_api_key:
-        raise ValueError("🛑 GROQ_API_KEY is not set in environment variables.")
-
-    # ✅ Initialize Groq LLM
-    llm = ChatGroq(
-        api_key=groq_api_key,
-        model="llama3-8b-8192",  # You can change this if needed
-        temperature=0.3
-    )
-
-    # ✅ Run the analyst
-    analyst = SentimentAnalyst("AAPL", llm)
-    result: SentimentAnalysisOutput = analyst.structured_analyze()
-
-    # ✅ Print results
-    print("📊 Sentiment Analysis:", result.model_dump())
-    print("🧾 Tokens Used:", analyst.get_last_token_count())
-
-    # ✅ Save to file
-    os.makedirs("outputs", exist_ok=True)
-    with open("outputs/sentiment_analysis_AAPL.txt", "w", encoding="utf-8") as f:
-        f.write(f"📌 Ticker: {result.ticker}\n")
-        f.write("\n📰 Headlines:\n" + "\n".join([f"- {h}" for h in result.headlines]))
-        f.write("\n\n📊 Sentiment Summary:\n" + result.summary_text)
-        f.write("\n\n🔍 Detailed Sentiment Analysis:\n" + result.sentiment_text)
-
-
+# Step 4: Provide test input and run
 if __name__ == "__main__":
-    test_sentiment_analyst()
+    test_state = {
+        "ticker": "AAPL"
+    }
+
+    print("🚀 Running SentimentAnalyst test...\n")
+    result = graph.invoke(test_state)
+
+    print("\n✅ Final SentimentAnalysis Output:")
+    print(json.dumps(result["sentiment_analysis"].dict(), indent=2))

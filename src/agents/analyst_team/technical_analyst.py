@@ -1,31 +1,28 @@
-from abc import ABC, abstractmethod
-from typing import List
-from pydantic import BaseModel
+from src.schemas.analyst_schemas import TechnicalAnalysisOutput
 from langchain_core.runnables import RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
+from langchain_core.language_models import BaseChatModel
 from langchain_community.callbacks.manager import get_openai_callback
-import os
-import requests
-from datetime import datetime, timedelta, timezone
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from src.agents.analyst_team import Analyst
-from src.schemas.analyst_schemas import TechnicalAnalysisOutput
-# Technical Analyst
-class TechnicalAnalystAgent(Analyst):
-    def __init__(self, ticker, llm, period='6mo', interval='1d'):
-        super().__init__(ticker, llm)
+
+
+class TechnicalAnalystAgent:
+    def __init__(self, llm: BaseChatModel, period='6mo', interval='1d'):
+        self.llm = llm
         self.period = period
         self.interval = interval
-        self.data = self._download_data()
-        self.indicators = {}
+        self._last_token_count = 0
 
-    def _download_data(self):
-        df = yf.download(self.ticker, period=self.period, interval=self.interval)
-        df.dropna(inplace=True)
-        return df
+    def _download_data(self, ticker: str):
+        try:
+            df = yf.download(ticker, period=self.period, interval=self.interval)
+            df.dropna(inplace=True)
+            return df
+        except Exception as e:
+            print(f"[ERROR] Failed to download data for {ticker}: {e}")
+            return pd.DataFrame()
 
     def _calculate_macd(self, close_prices, fast=12, slow=26, signal=9):
         ema_fast = close_prices.ewm(span=fast, adjust=False).mean()
@@ -45,8 +42,10 @@ class TechnicalAnalystAgent(Analyst):
         rsi = 100 - (100 / (1 + rs))
         return rsi
 
-    def structured_analyze(self) -> TechnicalAnalysisOutput:
-        df = self.data.copy()
+    def structured_analyze(self, ticker: str) -> TechnicalAnalysisOutput:
+        df = self._download_data(ticker)
+        if df.empty or 'Close' not in df:
+            raise ValueError(f"[ERROR] No data for ticker {ticker}. Cannot compute technical indicators.")
 
         macd_line, signal_line, histogram = self._calculate_macd(df['Close'])
         df['MACD'] = macd_line
@@ -62,7 +61,7 @@ class TechnicalAnalystAgent(Analyst):
         rsi = round(df['RSI'].iloc[-1], 2)
 
         prompt = (
-            f"{self.ticker} indicators:\n"
+            f"{ticker} indicators:\n"
             f"- MACD: {macd} | Signal: {signal} | Hist: {hist}\n"
             f"- RSI: {rsi}\n\n"
             "Give a short recommendation: Buy, Sell, or Hold? Justify briefly based on trends."
@@ -75,7 +74,7 @@ class TechnicalAnalystAgent(Analyst):
         recommendation = result.content.strip() if hasattr(result, 'content') else result
 
         return TechnicalAnalysisOutput(
-            ticker=self.ticker,
+            ticker=ticker,
             macd=macd,
             signal=signal,
             histogram=hist,
@@ -86,11 +85,25 @@ class TechnicalAnalystAgent(Analyst):
     def get_last_token_count(self):
         return self._last_token_count
 
-    def analyze(self):
-        return self.structured_analyze()
+    def analyze(self, ticker: str):
+        return self.structured_analyze(ticker)
 
-    def summary(self):
-        return self.structured_analyze().recommendation
+    def summary(self, ticker: str):
+        return self.structured_analyze(ticker).recommendation
 
     def as_runnable_node(self) -> RunnableLambda:
-        return RunnableLambda(lambda _: self.structured_analyze())
+        return RunnableLambda(lambda state: self.__call__(state))
+
+    def __call__(self, state: dict) -> dict:
+        ticker = state.get("ticker")
+        if not ticker:
+            print("[ERROR] Missing ticker in state.")
+            return {**state, "technical_analysis": None}
+    
+        try:
+            output = self.structured_analyze(ticker)
+            return {**state, "technical_analysis": output}
+        except Exception as e:
+            print(f"[ERROR] TechnicalAnalystAgent failed for {ticker}: {e}")
+            return {**state, "technical_analysis": None}
+

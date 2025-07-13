@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import os
-from src.agents.risk_management_team import AggressiveDebatorAgent
+from src.agents.risk_management_team import ConservativeDebatorAgent
 
 # ------------------------------
 # ✅ Load environment + Groq key
@@ -17,15 +17,15 @@ llm = ChatGroq(model="llama3-8b-8192", api_key=GROQ_API_KEY, temperature=0.3)
 # ------------------------------
 # ✅ Create agent instance
 # ------------------------------
-aggressive_node = AggressiveDebatorAgent(llm=llm)
+conservative_node = ConservativeDebatorAgent(llm=llm)
 
 # ------------------------------
 # ✅ LangGraph setup
 # ------------------------------
 graph = StateGraph(state_schema=dict)
-graph.add_node("aggressive", aggressive_node)
-graph.set_entry_point("aggressive")
-graph.set_finish_point("aggressive")
+graph.add_node("conservative", conservative_node)
+graph.set_entry_point("conservative")
+graph.set_finish_point("conservative")
 pipeline = graph.compile()
 
 # ------------------------------
@@ -55,7 +55,7 @@ mock_state = {
     "financial_flags": "Insider sales, elevated PE",
     "negative_news_themes": "CEO controversy, China EV price war",
     "overall_risk_assessment": "High but strategic",
-    "current_safe_response": "- Market overvalued\n- Wait for dip",
+    "current_risky_response": "- Massive upside from AI and FSD bets",
     "current_neutral_response": "- Promising long term, but uncertain near term",
     "history": "- Last trade on TSLA made 12% in 2 weeks"
 }
@@ -64,8 +64,8 @@ mock_state = {
 # ✅ Run and test
 # ------------------------------
 if __name__ == "__main__":
-    print("🚀 Running AggressiveDebatorAgent in LangGraph...")
+    print("🔍 Running ConservativeDebatorAgent in LangGraph...")
     result = pipeline.invoke(mock_state)
 
-    print("\n✅ Aggressive Response:")
-    print(result.get("aggressive_debate_response", "❌ No output returned."))
+    print("\n✅ Conservative Response:")
+    print(result.get("conservative_debate_response", "❌ No output returned."))
