@@ -125,10 +125,10 @@ pipeline = graph.compile()
 # === Run ===
 if __name__ == "__main__":
     state = {
-        "ticker": "AAPL",
+        "ticker": "NVDA",
         "portfolio_value": 50000,
         "cash_balance": 50000,
-        "holdings": {"AAPL": 0},
+        "holdings": {"NVDA": 0},
         "sector_exposure": {"tech": 0},
         "daily_returns": [0,0,0],
         "volatility": 0.50,
