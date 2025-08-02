@@ -2,9 +2,9 @@
 
 ## 🎯 Problem Analysis
 
-Your TraderAgents system was showing **overly conservative behavior**, defaulting to HOLD decisions even when analysis supported BUY recommendations. This was evident in the AAPL case where:
+TraderAgents system was showing **overly conservative behavior**, defaulting to HOLD decisions even when analysis supported BUY recommendations. This was evident in the AAPL case where:
 
-- **Your System**: HOLD (despite good fundamentals)
+- **System**: HOLD (despite good fundamentals)
 - **Independent Analysis**: BUY (based on same data)
 
 ## 🔍 Root Causes Identified
