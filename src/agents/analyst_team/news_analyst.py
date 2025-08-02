@@ -29,7 +29,7 @@ class NewsAnalyst:
                     f"https://finnhub.io/api/v1/company-news"
                     f"?symbol={ticker}&from={from_date}&to={to_date}&token={self.finnhub_api_key}"
                 )
-                resp = requests.get(url, timeout=5)
+                resp = requests.get(url, timeout=30)
                 if resp.status_code != 200:
                     print(f"[WARN] Finnhub API error: {resp.status_code}")
                     raise ValueError("Finnhub API call failed.")

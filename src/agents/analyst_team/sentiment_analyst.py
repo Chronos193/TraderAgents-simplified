@@ -27,7 +27,7 @@ class SentimentAnalyst(ABC):
             to_date = today.isoformat()
             url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={from_date}&to={to_date}&token={self.finnhub_api_key}"
             try:
-                resp = requests.get(url, timeout=5)
+                resp = requests.get(url, timeout=30)
                 data = resp.json()
                 data_sorted = sorted(data, key=lambda x: x.get("datetime", 0), reverse=True)
                 for article in data_sorted:
