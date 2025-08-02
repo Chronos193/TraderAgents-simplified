@@ -137,7 +137,8 @@ TraderAgents-simplified/
 ├── pipeline_tests/                # Individual component tests
 ├── test/                         # Unit tests
 ├── pyproject.toml                # Project dependencies
-└── README.md                     # This file
+├── README.md                     # This file
+└── run.py                        # Abstracted Python code to run entire Pipeline.
 ```
 
 ## 🔧 Configuration
@@ -283,4 +284,4 @@ If you encounter any issues or have questions:
 
 ---
 
-**Developed by Group-4** | Built with ❤️ using Python, LangChain, and AI
+**Developed by Group-4** | Built using Python, LangChain, and Groq
