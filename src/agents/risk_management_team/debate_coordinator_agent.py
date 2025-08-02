@@ -89,20 +89,31 @@ class DebateCoordinatorAgent:
         format_instructions = parser.get_format_instructions()
 
         summary_prompt = f"""
-You are a final decision maker summarizing a multi-agent investment debate involving three analysts: Conservative, Aggressive, and Neutral.
+You are a final decision maker synthesizing a multi-agent investment debate with improved decision logic.
+
+DECISION FRAMEWORK:
+1. Weight recent, specific data MORE HEAVILY than generic concerns
+2. Strong fundamentals + technical oversold conditions = bias toward action
+3. Only reject trades with clear, immediate risk factors
+4. Default to "accept" when analysis is positive but debate is mixed
 
 Trader's Proposal:
 {inputs.get('trader_decision') or inputs.get('reason_for_trade')}
 
+Key Analysis Points:
+- Fundamentals: {inputs.get('fundamentals', 'N/A')}
+- Technical: {inputs.get('technical', 'N/A')}
+- Recent News: {inputs.get('news', 'N/A')}
+
 Debate Transcript:
 {''.join(history)}
 
-Your job is to synthesize the debate and make a final decision on the trade. Choose between:
-- "accept"
-- "revise"
-- "reject"
+DECISION RULES:
+- "accept": Strong fundamentals + reasonable valuation + no immediate risks
+- "revise": Good opportunity but timing/sizing needs adjustment  
+- "reject": Clear fundamental problems or immediate major risks
 
-Please respond with only valid JSON. Do not include markdown formatting or any extra explanation.
+Favor action over inaction when analysis supports the trade thesis.
 {format_instructions}
 """
 

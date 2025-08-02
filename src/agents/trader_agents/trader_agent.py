@@ -23,7 +23,30 @@ class TraderAgent:
 
     def generate_proposal(self, debate: DebateResult, user_info: Dict) -> TradeProposal:
         winner = debate.winner
-        action = "buy" if winner == "Bullish" else "sell" if winner == "Bearish" else "hold"
+        
+        # 🎯 IMPROVED DECISION LOGIC: Less conservative, more action-oriented
+        if winner == "Bullish":
+            action = "buy"
+        elif winner == "Bearish":
+            action = "sell" 
+        else:  # winner == "Tie"
+            # NEW: Instead of always defaulting to "hold", check debate content
+            bullish_mentions = sum(1 for turn in debate.turns if 
+                                 any(word in turn.message.lower() for word in 
+                                     ['strong', 'growth', 'positive', 'bullish', 'buy', 'undervalued']))
+            bearish_mentions = sum(1 for turn in debate.turns if 
+                                 any(word in turn.message.lower() for word in 
+                                     ['risk', 'overvalued', 'decline', 'bearish', 'sell', 'expensive']))
+            
+            # Tie-breaker: favor action when there's strong evidence on either side
+            if bullish_mentions > bearish_mentions * 1.2:  # 20% bias toward action
+                action = "buy"
+                print(f"[INFO] Tie broken in favor of BUY based on debate content ({bullish_mentions} vs {bearish_mentions})")
+            elif bearish_mentions > bullish_mentions * 1.2:
+                action = "sell"
+                print(f"[INFO] Tie broken in favor of SELL based on debate content ({bearish_mentions} vs {bullish_mentions})")
+            else:
+                action = "hold"
 
         # ✅ Fetch price
         price = self.fetch_price_from_yfinance(user_info["ticker"])
@@ -31,11 +54,22 @@ class TraderAgent:
 
         current_shares = user_info["holdings"].get(user_info["ticker"], 0)
 
+        # 🔧 Position-aware logic fix
+        if action == "sell" and current_shares == 0:
+            print(f"[INFO] Cannot sell {user_info['ticker']} - no shares owned. Changing to HOLD.")
+            action = "hold"
+
         # ✅ Quantity logic
         if "quantity" in user_info and user_info["quantity"] is not None:
             quantity = float(user_info["quantity"])
         elif action == "buy":
-            quantity = user_info["cash_balance"] // price
+            max_shares = user_info["cash_balance"] // price
+            if max_shares == 0:
+                print(f"[INFO] Cannot buy {user_info['ticker']} - insufficient cash. Changing to HOLD.")
+                action = "hold"
+                quantity = 0.0
+            else:
+                quantity = max_shares
         elif action == "sell":
             quantity = min(current_shares, user_info["quantity"] or current_shares)
         else:

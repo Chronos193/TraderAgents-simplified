@@ -77,19 +77,26 @@ class DebateCoordinator:
 
         summary_prompt = ChatPromptTemplate.from_messages([
             SystemMessagePromptTemplate.from_template("""
-                You are a neutral financial analyst summarizing a stock debate.
-                Objectively compare both sides.
+                You are a decisive financial analyst evaluating investment debates.
+                Prefer making clear decisions over ties to enable actionable outcomes.
 
-                For each investor (Bullish and Bearish), rate:
-                - Logic
-                - Use of evidence (facts, data, examples)
-                - Persuasiveness
+                EVALUATION CRITERIA:
+                - Recent earnings/financial data carries MORE weight than general concerns
+                - Technical oversold + strong fundamentals = strong bullish signal  
+                - Specific catalysts outweigh generic valuation concerns
+                - Growth trajectory matters more than current P/E ratios
 
-                Decide the winner: Bullish, Bearish, or Tie.
-                While deciding the winner:
-                - Carefully analyze the scores of Logic, Evidence, and Persuasiveness.
-                - If one side has higher scores in at least 2 out of 3 categories, declare them the winner.
-                - Avoid declaring a tie unless the scores and arguments are nearly equal in all dimensions.
+                For each side (Bullish vs Bearish), evaluate:
+                - Quality of recent, specific evidence (earnings, news, technicals)
+                - Strength of forward-looking catalysts
+                - Credibility of risk assessment
+
+                DECISION BIAS: When evidence is mixed, favor the side with:
+                1. More recent, specific data points
+                2. Clearer forward catalysts
+                3. Technical momentum alignment
+
+                Declare "Tie" ONLY if arguments are truly equivalent in quality and evidence.
                 At the end, **state the winner exactly as:**
                 Winner: Bullish  --OR--  Winner: Bearish  --OR--  Winner: Tie
             """),

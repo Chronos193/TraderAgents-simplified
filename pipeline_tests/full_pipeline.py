@@ -42,8 +42,23 @@ def inject_trade_and_risk(state: dict) -> dict:
 
     trade_dict = trade.model_dump() if trade else {}
     risk_dict = risk.model_dump() if risk else {}
-
-    return {**state, **trade_dict, **risk_dict}
+    
+    # 🔧 FIXED: Provide default values for missing risk management variables
+    defaults = {
+        "price": state.get("price", 0.0),
+        "quantity": state.get("quantity", 0.0), 
+        "new_cash_balance": state.get("cash_balance", 0.0),
+        "new_position_size": 0.0,
+        "simulated_drawdown": "N/A",
+        "history": [],
+        "current_risky_response": "",
+        "current_safe_response": "",
+        "current_neutral_response": ""
+    }
+    
+    # Merge with priority: trade_dict > risk_dict > defaults > state
+    result = {**defaults, **state, **risk_dict, **trade_dict}
+    return result
 
 
 # === Instantiate Agents ===
@@ -125,13 +140,13 @@ pipeline = graph.compile()
 # === Run ===
 if __name__ == "__main__":
     state = {
-        "ticker": "NVDA",
+        "ticker": "AAPL",
         "portfolio_value": 50000,
         "cash_balance": 50000,
-        "holdings": {"NVDA": 0},
+        "holdings": {"AAPL": 0},
         "sector_exposure": {"tech": 0},
         "daily_returns": [0,0,0],
-        "volatility": 0.50,
+        "volatility": 0.286,
         "avg_volume": 50000,
         "correlation_with_portfolio": 0,
         "upcoming_events": [" "],
